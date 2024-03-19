@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>file_size file_size</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+  </style>
+  <link rel="stylesheet" href="https://lerina.github.io/css/styles_min.css" />
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#devnotes">DevNotes</a>
+<ul>
+<li><a href="#release-default-vs-debug">–release (default) vs debug</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="devnotes">DevNotes</h1>
+<h2 id="release-default-vs-debug">–release (default) vs debug</h2>
+<ol type="1">
+<li><code>wasm-pack build --target web --no-typescript --out-dir www --debug</code></li>
+</ol>
+<pre><code>ls -lh www/pkg/
+Permissions Size User Date Modified Name
+.rw-rw-r--   184 tac  16 Mar 13:04  package.json
+.rw-rw-r--   17k tac  16 Mar 13:04  wasm_input.js
+.rw-rw-r--  160k tac  16 Mar 13:04  wasm_input_bg.wasm</code></pre>
+<ol start="2" type="1">
+<li><code>wasm-pack build --target web --no-typescript --out-dir www</code></li>
+</ol>
+<pre><code>ls -lh www/pkg/
+Permissions Size User Date Modified Name
+.rw-rw-r--   184 tac  16 Mar 13:09  package.json
+.rw-rw-r--   15k tac  16 Mar 13:09  wasm_input.js
+.rw-rw-r--   26k tac  16 Mar 13:09  wasm_input_bg.wasm</code></pre>
+</body>
+</html>
