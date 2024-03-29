@@ -1,15 +1,16 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
-//use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, KeyboardEvent};
 
 mod browser;
+mod enemy;
 mod engine;
 mod player;
+mod state;
+mod view;
 mod weapon;
-mod enemy;
 
-use browser::{now, request_animation_frame};
+use browser::request_animation_frame;
 use engine::Game;
 
 #[wasm_bindgen(start)]
@@ -20,22 +21,22 @@ fn run() -> Result<(), JsValue> {
     let g = f.clone();
 
     let game_ref = Rc::new(RefCell::new(Game::new()));
-    game_ref.borrow_mut().init();
+    game_ref.borrow_mut().renderer.init();
 
     //--
     let mut keystate = browser::KeyState::new();
-    let mut keyevent_receiver = browser::prepare_input()?;
+    let mut keyevent_receiver = browser::prepare_input(&engine::CANVAS_NAME)?;
 
     *g.borrow_mut() = Some(Closure::new(move || {
         let game = Rc::clone(&game_ref);
-        
+
         // INPUT
         browser::process_input(&mut keystate, &mut keyevent_receiver);
-        
+
         // UPDATE
         let mut game = game.borrow_mut();
-        game.update(&keystate);
-        
+        game.update(&mut keystate);
+
         // DRAW
         game.draw();
 

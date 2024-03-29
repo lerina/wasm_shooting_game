@@ -1,10 +1,15 @@
 use crate::browser;
-use crate::enemy::Enemy;
+use crate::enemy::{EnemyController, spawn_ennemies};
 use crate::player::Player;
-use crate::weapon::gun::{Bullet, BulletController};
+use crate::state;
+use crate::view::web_renderer as renderer;
+use crate::weapon::gun::BulletController;
 
-const GAME_WIDTH: f32 = 600.0;
-const GAME_HEIGHT: f32 = 600.0;
+pub const GAME_WIDTH: f32 = 600.0;
+pub const GAME_HEIGHT: f32 = 600.0;
+pub const CANVAS_NAME: &str = "canvas";
+pub const PLAYER_STARTING_X: f32 = GAME_WIDTH / 2.0 - 25.0;
+pub const PLAYER_STARTING_Y: f32 = GAME_HEIGHT - 55.0;
 
 struct Point {
     x: f32,
@@ -12,149 +17,227 @@ struct Point {
 }
 
 pub struct Game {
-    x: f32,
-    y: f32,
-    width: f32,
-    height: f32,
-    pub time_frame: f64,
-    pub player: Player,
-    enemies: Vec<Enemy>,
-    pub bullet_controller: BulletController,
+    player: Player,
+    enemy_ctrl: EnemyController,
+    pub renderer: renderer::Renderer,
+    game_state: state::GameState,
+    bullet_controller: BulletController,
+    level: i32,
+    score: i32,
+    best: i32,
     shoot_pressed: bool,
-    cnv: web_sys::HtmlCanvasElement,
-    ctx: web_sys::CanvasRenderingContext2d,
 }
 
 impl Game {
     pub fn new() -> Self {
-        let enemies = vec![
-            Enemy::new(50.0, 20.0, "green".into(), 5),
-            Enemy::new(150.0, 20.0, "red".into(), 5),
-            Enemy::new(250.0, 20.0, "gold".into(), 2),
-            Enemy::new(350.0, 20.0, "green".into(), 2),
-            Enemy::new(450.0, 20.0, "gold".into(), 10),
-            Enemy::new(50.0, 100.0, "green".into(), 5),
-            Enemy::new(150.0, 100.0, "red".into(), 5),
-            Enemy::new(250.0, 100.0, "gold".into(), 2),
-            Enemy::new(350.0, 100.0, "green".into(), 2),
-            Enemy::new(450.0, 100.0, "gold".into(), 20),
-        ];
-
         Game {
-            x: 0.0,
-            y: 0.0,
-            width: GAME_WIDTH,
-            height: GAME_HEIGHT,
-            time_frame: 0.0,
-            player: Player::new(GAME_WIDTH / 2.0 - 25.0, GAME_HEIGHT - 55.0),
-            enemies,
+            player: Player::new(PLAYER_STARTING_X, PLAYER_STARTING_Y),
+            enemy_ctrl: EnemyController::new(1),
+            renderer: renderer::Renderer::new(0.0, 0.0, GAME_WIDTH, GAME_HEIGHT, &CANVAS_NAME),
+            game_state: state::GameState::Menu,
             bullet_controller: BulletController::new(),
+            level: 1,
+            score: 0,
+            best: 0,
             shoot_pressed: false,
-            cnv: browser::canvas(),
-            ctx: browser::context(),
         }
     }
-    pub fn init(&mut self) {
-        //self.laser.push(Bullet::new(GAME_WIDTH / 2.0 - 5.0, GAME_HEIGHT - 58.0));
-        let _ = self.cnv.focus();
-        self.set_common_style();
-    }
-    pub fn update(&mut self, keystate: &browser::KeyState) {
-        let mut velocity = Point { x: 0.0, y: 0.0 };
-        if keystate.is_pressed("ArrowDown") {
-            velocity.y += 3.0;
-            //log!("ArrowDown");
-        }
 
-        if keystate.is_pressed("ArrowUp") {
-            velocity.y -= 3.0;
-            //log!("ArrowUp");
-        }
+    pub fn update(&mut self, keystate: &mut browser::KeyState) {
+        match self.game_state {
+            state::GameState::Playing => {
+                let mut velocity = Point { x: 0.0, y: 0.0 };
+                if keystate.is_pressed("ArrowDown") {
+                    velocity.y += 3.0;
+                }
 
-        if keystate.is_pressed("ArrowRight") {
-            velocity.x += 3.0;
-            //log!("ArrowRight");
-        }
+                if keystate.is_pressed("ArrowUp") {
+                    velocity.y -= 3.0;
+                }
 
-        if keystate.is_pressed("ArrowLeft") {
-            velocity.x -= 3.0;
-            //log!("ArrowLeft");
-        }
-        if keystate.is_pressed("Space") {
-            self.shoot_pressed = true;
-            //log!("Spacebar");
-        }
+                if keystate.is_pressed("ArrowRight") {
+                    velocity.x += 3.0;
+                }
 
-        self.player.set_x(self.player.x() + velocity.x);
-        self.player.set_y(self.player.y() + velocity.y);
-        self.handle_shoot();
-        self.bullet_controller.remove_dead_bullets();
-        self.handle_enemy();
+                if keystate.is_pressed("ArrowLeft") {
+                    velocity.x -= 3.0;
+                }
+        
+                if keystate.is_pressed("Space") {
+                    self.shoot_pressed = true;
+                }
+
+                //---------------------
+
+                if self.enemy_ctrl.all_dead() {
+                    self.level_up();
+                    self.game_state = state::GameState::Levelup;
+                }
+                if self
+                    .enemy_ctrl
+                    .has_reached_bottom(GAME_HEIGHT - self.player.height - 57.0)
+                    //if DEV 
+                    //.has_reached_bottom(self.player.y)
+                {
+                    self.game_state = state::GameState::Gameover;
+                }else {
+                    self.enemy_ctrl.move_enemies(GAME_WIDTH, GAME_HEIGHT);
+
+                self.move_player(velocity);
+                self.handle_shoot();
+                self.handle_enemy();
+                self.bullet_controller.remove_dead_bullets();
+                self.handle_best_score(); 
+               }
+
+            }, //^--Playing
+            state::GameState::Menu => {
+                if keystate.is_pressed("Space") {
+                    self.game_state = state::GameState::Ready;
+                    keystate.drain();
+                    self.reset();
+                }
+            },//^-- reset
+            state::GameState::Gameover => {
+                if keystate.is_pressed("KeyY") {
+                    self.game_state = state::GameState::Menu;
+                    keystate.drain();
+                }
+                if keystate.is_pressed("KeyN") {
+                    self.game_state = state::GameState::Topscore;
+                    keystate.drain();
+                }
+                //self.handle_gameover();
+            }, //^-- Gameover
+            state::GameState::Ready => {
+                if keystate.is_pressed("Space") {
+                    self.bullet_controller.drain();
+                    keystate.drain();
+                    self.game_state = state::GameState::Playing;
+                }
+            }, //^--Ready
+            state::GameState::Topscore => {
+                if keystate.is_pressed("Space") {
+                    self.game_state = state::GameState::Menu;
+                    keystate.drain();
+                }
+            }, //^--Topscore
+            state::GameState::Levelup => {
+                if keystate.is_pressed("Space") {
+                    self.game_state = state::GameState::Ready;
+                    keystate.drain();
+                }
+            }, //^--Levelup
+        } //^-- match self.game_state
+    } //^--fn update()
+
+    fn move_player(&mut self, velocity: Point) {
+        self.player.x += velocity.x;
+        self.player.y += velocity.y;
     }
 
     fn handle_shoot(&mut self) {
         if self.shoot_pressed {
-            self.bullet_controller.shoot(
-                self.player.x() + self.player.width() / 2.0,
-                self.player.y(),
-                5.0,
-                1,
-                7.0,
-            );
+            self.bullet_controller
+                .shoot(self.player.x + self.player.width / 2.0, self.player.y, 5.0, 1, 7.0);
 
             self.shoot_pressed = false;
         }
-        //self.bullet_controller.shoot();
-    }
-    pub fn handle_enemy(&mut self) {
-        for enemy in &mut self.enemies {
-            if self.bullet_controller.collide_with(&enemy) {
-                enemy.take_damage(1); // losing ability to change damage based on bullet
+    } //^--fn handle_shoot
+
+    fn handle_enemy(&mut self) {
+        //self.enemy_ctrl.
+        for row in &mut self.enemy_ctrl.enemies {
+            for enemy in row {
+                if self.bullet_controller.collide_with(enemy) {
+                    self.score += 1;
+                }
             }
         }
-        self.enemies.retain(|enemy| enemy.health() > 0);
+
+        self.rm_dead_enemies();
+    } //^--fn handle_enemy
+    fn rm_dead_enemies(&mut self) {
+        for row in &mut self.enemy_ctrl.enemies {
+            row.retain(|enemy| enemy.health > 0);
+        }
     }
-    pub fn set_common_style(&self) {
-        self.ctx.set_shadow_color("#d53");
-        self.ctx.set_shadow_blur(20.0);
-        self.ctx.set_line_join("bevel");
-        self.ctx.set_line_width(5.0);
+    fn level_up(&mut self) {
+        self.level +=1;
+        self.enemy_ctrl.enemies = spawn_ennemies(self.level);
     }
-    pub fn clear_canvas(&self) {
-        self.ctx.set_fill_style(&"rgb(0,0,0)".into());
-        self.ctx
-            .clear_rect(self.x.into(), self.y.into(), self.width.into(), self.height.into());
-        self.ctx
-            .fill_rect(self.x.into(), self.y.into(), self.width.into(), self.height.into());
+    fn reset(&mut self) {
+        self.level =1;
+        self.score =0;
+        self.enemy_ctrl.enemies = spawn_ennemies(self.level);
+        self.player.x = PLAYER_STARTING_X;
+        self.player.y = PLAYER_STARTING_Y;
+    }
+    fn handle_best_score(&mut self) {
+        if self.best < self.score {
+            self.best = self.score
+        }
     }
     pub fn draw(&mut self) {
-        self.clear_canvas();
-        //        for bullet in &self.laser {
-        //            if !bullet.remove {
-        //                self.draw_laser(&bullet);
-        //            }
-        //        }
-        self.draw_bullets();
-        self.draw_player();
-        self.draw_enemies();
+        self.renderer.clear_canvas();
+        match self.game_state {
+            state::GameState::Playing => {
+                self.draw_enemies();
+                self.draw_bullets();
+                self.show_game_info();
+                self.draw_player();
+            },
+            state::GameState::Ready => {
+                self.show_game_info();
+                self.draw_ready(); 
+            },
+            state::GameState::Gameover => {
+                self.draw_gameover();
+            },
+            state::GameState::Topscore => {
+                self.draw_top_score();
+            },
+            state::GameState::Levelup => {
+                self.draw_level_up();
+            },
+            state::GameState::Menu => {
+                self.draw_menu();
+            },
+        } //^--match
     }
-    pub fn draw_player(&self) {
-        self.ctx.set_stroke_style(&"yellow".into()); // &JsValue::from_str("yellow")
-        self.ctx.set_fill_style(&"black".into()); // into know to use JsValue::from_str
-        self.ctx.stroke_rect(
-            self.player.x().into(),
-            self.player.y().into(),
-            self.player.width().into(),
-            self.player.height().into(),
-        );
-        self.ctx.fill_rect(
-            self.player.x().into(),
-            self.player.y().into(),
-            self.player.width().into(),
-            self.player.height().into(),
-        );
+    fn draw_menu(&self) {
+        self.renderer.draw_menu();
     }
-    pub fn draw_bullets(&mut self) {
+    fn draw_ready(&self) {
+        self.renderer.draw_ready(self.level);
+    }
+    fn draw_gameover(&self) {
+        self.renderer.draw_gameover();
+    }
+
+    fn draw_top_score(&self) {
+        self.renderer.draw_top_score(self.best, self.score);
+    }
+    fn show_game_info(&self) {
+       self.renderer.text_score(self.score);
+       self.renderer.text_level(self.level);
+    }
+    fn draw_level_up(&self) {
+        self.renderer.draw_level_up(self.level);
+    }
+    fn draw_player(&self) {
+        self.renderer.draw_player(&self.player);
+    }
+
+    fn draw_enemies(&self) {
+        for enemy_row in &self.enemy_ctrl.enemies {
+            for enemy in enemy_row {
+                self.renderer.draw_enemy(&enemy);
+            }
+        }
+    } //^-- draw_enemies
+
+    fn draw_bullets(&mut self) {
         /*
         SOURCE: https://users.rust-lang.org/t/finding-and-removing-an-element-in-a-vec/42166
         Sol 1.
@@ -174,65 +257,10 @@ impl Game {
             .retain(|bullet| !BulletController::is_bullet_off_screen(&bullet));
 
         for bullet in &self.bullet_controller.bullets {
-            self.draw_bullet(&bullet);
+            self.renderer.draw_bullet(&bullet);
         }
         for bullet in &mut self.bullet_controller.bullets {
-            let y = bullet.y();
-            bullet.set_y(y - bullet.speed());
+            bullet.y -= bullet.speed();
         }
     }
-
-    pub fn draw_bullet(&self, bullet: &Bullet) {
-        self.ctx.set_stroke_style(&"red".into()); // &JsValue::from_str("yellow")
-        self.ctx.set_fill_style(&"grey".into()); // into know to use JsValue::from_str
-        self.ctx.stroke_rect(
-            bullet.x().into(),
-            bullet.y().into(),
-            bullet.width().into(),
-            bullet.height().into(),
-        );
-        self.ctx.fill_rect(
-            bullet.x().into(),
-            bullet.y().into(),
-            bullet.width().into(),
-            bullet.height().into(),
-        );
-    }
-    fn draw_enemies(&self) {
-        for enemy in &self.enemies {
-            self.draw_enemy(&enemy);
-        }
-    }
-    fn draw_enemy(&self, enemy: &Enemy) {
-        self.ctx.set_fill_style(&enemy.color().into());
-        if enemy.health() > 1 {
-            self.ctx.set_stroke_style(&"white".into());
-        } else {
-            self.ctx.set_stroke_style(&enemy.color().into());
-        }
-
-        //DEBUG: web_sys::console::log_1(&format!("draw me: x:{} y:{}", enemy.x(), enemy.y()).into());
-
-        self.ctx.fill_rect(
-            enemy.x().into(),
-            enemy.y().into(),
-            enemy.width().into(),
-            enemy.height().into(),
-        );
-        self.ctx.stroke_rect(
-            enemy.x().into(),
-            enemy.y().into(),
-            enemy.width().into(),
-            enemy.height().into(),
-        );
-        //Draw Text
-        let health = format!("{}", enemy.health());
-        self.ctx.set_fill_style(&"black".into());
-        self.ctx.set_font(&"25px Arial");
-        let _ = self.ctx.fill_text(
-            &health,
-            (enemy.x() + enemy.width() / 3.5).into(),
-            (enemy.y() + enemy.height() / 1.5).into(),
-        );
-    }
-} //^--impl Game
+}

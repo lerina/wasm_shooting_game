@@ -1,5 +1,3 @@
-use wasm_bindgen::prelude::*;
-//--
 use futures::channel::mpsc::{unbounded, UnboundedReceiver};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use wasm_bindgen::{prelude::Closure, JsCast};
@@ -22,16 +20,17 @@ pub fn document() -> web_sys::Document {
 //     document().body().expect("document should have a body")
 // }
 
-pub fn canvas() -> web_sys::HtmlCanvasElement {
+//putting up with `canvas_name: &str` let us have multiple canvas elements on the same page
+pub fn canvas(canvas_name: &str) -> web_sys::HtmlCanvasElement {
     document()
-        .get_element_by_id("canvas")
+        .get_element_by_id(canvas_name)
         .expect("should have a canvas element in the document")
         .dyn_into::<web_sys::HtmlCanvasElement>()
         .expect("could not convert to HtmlCanvasElement")
 }
 
-pub fn context() -> web_sys::CanvasRenderingContext2d {
-    canvas()
+pub fn context(canvas_name: &str) -> web_sys::CanvasRenderingContext2d {
+    canvas(canvas_name)
         .get_context("2d")
         .unwrap()
         .unwrap()
@@ -39,11 +38,22 @@ pub fn context() -> web_sys::CanvasRenderingContext2d {
         .unwrap()
 }
 
-pub fn now() -> f64 {
-    window().performance().expect("should have a Performance").now()
+pub fn set_span(id: &str, txt: i32){
+     document()
+        .get_element_by_id(id)
+        .unwrap()
+        .dyn_ref::<web_sys::HtmlElement>()
+        .unwrap()
+        .set_inner_text( &format!("{}",txt) );
 }
 
-// KB
+
+//pub fn now() -> f64 {
+//    window().performance().expect("should have a Performance").now()
+//}
+//
+
+//-------------------- KB
 pub struct KeyState {
     pressed_keys: HashMap<String, web_sys::KeyboardEvent>,
 }
@@ -66,6 +76,9 @@ impl KeyState {
     fn set_released(&mut self, code: &str) {
         self.pressed_keys.remove(code.into());
     }
+    pub fn drain(&mut self) {
+        self.pressed_keys.drain();
+    }
 }
 
 pub enum KeyPress {
@@ -86,7 +99,7 @@ pub fn process_input(state: &mut KeyState, keyevent_receiver: &mut UnboundedRece
     }
 }
 
-pub fn prepare_input() -> std::result::Result<UnboundedReceiver<KeyPress>, String> {
+pub fn prepare_input(canvas_name: &str) -> std::result::Result<UnboundedReceiver<KeyPress>, String> {
     let (keydown_sender, keyevent_receiver) = unbounded();
     let keydown_sender = Rc::new(RefCell::new(keydown_sender));
     let keyup_sender = Rc::clone(&keydown_sender);
@@ -98,8 +111,8 @@ pub fn prepare_input() -> std::result::Result<UnboundedReceiver<KeyPress>, Strin
         let _ = keyup_sender.borrow_mut().start_send(KeyPress::KeyUp(keycode));
     }) as Box<dyn FnMut(web_sys::KeyboardEvent)>);
 
-    canvas().set_onkeydown(Some(onkeydown.as_ref().unchecked_ref()));
-    canvas().set_onkeyup(Some(onkeyup.as_ref().unchecked_ref()));
+    canvas(canvas_name).set_onkeydown(Some(onkeydown.as_ref().unchecked_ref()));
+    canvas(canvas_name).set_onkeyup(Some(onkeyup.as_ref().unchecked_ref()));
     onkeydown.forget();
     onkeyup.forget();
 

@@ -2,14 +2,22 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>Rust wasm shooting game</title>
+    <title>Rust wasm input example</title>
+    <style>
+    h1 {margin: 0px; margin-bottom: 10px; font-size: 2.9em; font-family: "Helvetica"}
+    canvas {box-shadow: black 20px 10px 50px}
+    body {display: flex; align-items: center; flex-direction: column; padding: 0px; margin: 0px; height: 100vh;}
+    </style>
   </head>
   <body>
+  <h1> Invaders</h1>
+  <div id="Level">Level:<span id="level"></span></div>
+  <div id="scoring">Score:<span id="score"></span></div>
   <canvas id="canvas" style="outline: none" tabindex="0" height="600" width="600">
     Your browser does not support the Canvas.
   </canvas>
     <script type="module">
-    import init from "./pkg/wasm_shooting_game.js";
+    import init from "./pkg/wasm_shoot.js";
 
       async function run() {
         await init();

@@ -17,8 +17,11 @@ pub mod gun {
         pub fn remove_dead_bullets(&mut self) {
             self.bullets.retain(|bullet| !bullet.remove)
         }
+        pub fn drain(&mut self) {
+            self.bullets.drain(..);
+        }
         pub fn is_bullet_off_screen(bullet: &Bullet) -> bool {
-            bullet.y <= 14.0 //-bullet.height
+            bullet.y <= bullet.height * 2.0
         }
 
         pub fn shoot(&mut self, x: f32, y: f32, speed: f32, damage: i32, delay: f32) {
@@ -30,7 +33,7 @@ pub mod gun {
 
             self.timer_till_next_bullet -= 1.0;
         } //^-- shoot
-        pub fn collide_with(&mut self, enemy: &Enemy) -> bool {
+        pub fn collide_with(&mut self, enemy: &mut Enemy) -> bool {
             for bullet in &mut self.bullets {
                 if bullet.collide_with(enemy) {
                     bullet.remove();
@@ -44,10 +47,10 @@ pub mod gun {
 
     //#[derive(Copy, Clone)]
     pub struct Bullet {
-        x: f32,
-        y: f32,
-        width: f32,
-        height: f32,
+        pub x: f32,
+        pub y: f32,
+        pub width: f32,
+        pub height: f32,
         speed: f32,
         delay: f32,
         damage: i32,
@@ -67,24 +70,7 @@ pub mod gun {
                 remove: false,
             }
         }
-        pub fn x(&self) -> f32 {
-            self.x
-        }
-        pub fn set_x(&mut self, x: f32) {
-            self.x = x;
-        }
-        pub fn y(&self) -> f32 {
-            self.y
-        }
-        pub fn set_y(&mut self, y: f32) {
-            self.y = y;
-        }
-        pub fn width(&self) -> f32 {
-            self.width
-        }
-        pub fn height(&self) -> f32 {
-            self.height
-        }
+
         pub fn speed(&self) -> f32 {
             self.speed
         }
@@ -94,13 +80,13 @@ pub mod gun {
         pub fn damage(&self) -> i32 {
             self.damage
         }
-        pub fn collide_with(&self, other: &Enemy) -> bool {
-            if self.x < other.x() + other.width()
-                && self.x + self.width > other.x()
-                && self.y < other.y() + other.height()
-                && self.y + self.height > other.y()
+        pub fn collide_with(&self, other: &mut Enemy) -> bool {
+            if self.x < other.x + other.width
+                && self.x + self.width > other.x
+                && self.y < other.y + other.height
+                && self.y + self.height > other.y
             {
-                //other.take_damage(self.damage);
+                other.take_damage(self.damage);
                 return true;
             }
             false
