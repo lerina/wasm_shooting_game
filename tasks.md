@@ -23,5 +23,11 @@
 - [x] shoot enemy (collision detection)
 - [x] hit count
 - [x] rm enemy
-- [ ] mv enemy
-- [ ] spawn enemies
+- [x] mv enemy
+- [x] spawn enemies
+
+---------
+
+- [x] menu, transition phases
+- [x] reset player position when leveling up
+- [x] player bound

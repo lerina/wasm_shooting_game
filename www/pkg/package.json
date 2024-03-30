@@ -1,0 +1,12 @@
+{
+  "name": "wasm_shooting_game",
+  "version": "0.1.0",
+  "files": [
+    "wasm_shooting_game_bg.wasm",
+    "wasm_shooting_game.js"
+  ],
+  "module": "wasm_shooting_game.js",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

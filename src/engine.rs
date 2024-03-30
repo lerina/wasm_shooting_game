@@ -1,5 +1,5 @@
 use crate::browser;
-use crate::enemy::{EnemyController, spawn_ennemies};
+use crate::enemy::{spawn_ennemies, EnemyController};
 use crate::player::Player;
 use crate::state;
 use crate::view::web_renderer as renderer;
@@ -62,7 +62,7 @@ impl Game {
                 if keystate.is_pressed("ArrowLeft") {
                     velocity.x -= 3.0;
                 }
-        
+
                 if keystate.is_pressed("Space") {
                     self.shoot_pressed = true;
                 }
@@ -76,28 +76,28 @@ impl Game {
                 if self
                     .enemy_ctrl
                     .has_reached_bottom(GAME_HEIGHT - self.player.height - 57.0)
-                    //if DEV 
-                    //.has_reached_bottom(self.player.y)
+                //if DEV
+                //.has_reached_bottom(self.player.y)
                 {
                     self.game_state = state::GameState::Gameover;
-                }else {
+                } else {
                     self.enemy_ctrl.move_enemies(GAME_WIDTH, GAME_HEIGHT);
 
-                self.move_player(velocity);
-                self.handle_shoot();
-                self.handle_enemy();
-                self.bullet_controller.remove_dead_bullets();
-                self.handle_best_score(); 
-               }
-
-            }, //^--Playing
+                    self.move_player(velocity);
+                    self.check_bound();
+                    self.handle_shoot();
+                    self.handle_enemy();
+                    self.bullet_controller.remove_dead_bullets();
+                    self.handle_best_score();
+                }
+            } //^--Playing
             state::GameState::Menu => {
                 if keystate.is_pressed("Space") {
                     self.game_state = state::GameState::Ready;
                     keystate.drain();
                     self.reset();
                 }
-            },//^-- reset
+            } //^-- reset
             state::GameState::Gameover => {
                 if keystate.is_pressed("KeyY") {
                     self.game_state = state::GameState::Menu;
@@ -108,32 +108,50 @@ impl Game {
                     keystate.drain();
                 }
                 //self.handle_gameover();
-            }, //^-- Gameover
+            } //^-- Gameover
             state::GameState::Ready => {
                 if keystate.is_pressed("Space") {
                     self.bullet_controller.drain();
                     keystate.drain();
                     self.game_state = state::GameState::Playing;
                 }
-            }, //^--Ready
+            } //^--Ready
             state::GameState::Topscore => {
                 if keystate.is_pressed("Space") {
                     self.game_state = state::GameState::Menu;
                     keystate.drain();
                 }
-            }, //^--Topscore
+            } //^--Topscore
             state::GameState::Levelup => {
                 if keystate.is_pressed("Space") {
                     self.game_state = state::GameState::Ready;
                     keystate.drain();
                 }
-            }, //^--Levelup
+            } //^--Levelup
         } //^-- match self.game_state
     } //^--fn update()
 
     fn move_player(&mut self, velocity: Point) {
         self.player.x += velocity.x;
         self.player.y += velocity.y;
+    }
+    fn check_bound(&mut self) {
+        let left_bound = 3.0;
+        let right_bound = GAME_WIDTH - self.player.width - 3.0;
+        let upper_bound = 3.0;
+        let lower_bound = GAME_HEIGHT - self.player.height - 3.0;
+        if self.player.x <= left_bound {
+            self.player.x = left_bound;
+        }
+        if self.player.x >= right_bound {
+            self.player.x = right_bound;
+        }
+        if self.player.y <= upper_bound {
+            self.player.y = lower_bound;
+        }
+        if self.player.y >= lower_bound {
+            self.player.y = lower_bound;
+        }
     }
 
     fn handle_shoot(&mut self) {
@@ -163,12 +181,14 @@ impl Game {
         }
     }
     fn level_up(&mut self) {
-        self.level +=1;
+        self.level += 1;
         self.enemy_ctrl.enemies = spawn_ennemies(self.level);
+        self.player.x = PLAYER_STARTING_X;
+        self.player.y = PLAYER_STARTING_Y;
     }
     fn reset(&mut self) {
-        self.level =1;
-        self.score =0;
+        self.level = 1;
+        self.score = 0;
         self.enemy_ctrl.enemies = spawn_ennemies(self.level);
         self.player.x = PLAYER_STARTING_X;
         self.player.y = PLAYER_STARTING_Y;
@@ -186,23 +206,23 @@ impl Game {
                 self.draw_bullets();
                 self.show_game_info();
                 self.draw_player();
-            },
+            }
             state::GameState::Ready => {
                 self.show_game_info();
-                self.draw_ready(); 
-            },
+                self.draw_ready();
+            }
             state::GameState::Gameover => {
                 self.draw_gameover();
-            },
+            }
             state::GameState::Topscore => {
                 self.draw_top_score();
-            },
+            }
             state::GameState::Levelup => {
                 self.draw_level_up();
-            },
+            }
             state::GameState::Menu => {
                 self.draw_menu();
-            },
+            }
         } //^--match
     }
     fn draw_menu(&self) {
@@ -219,8 +239,8 @@ impl Game {
         self.renderer.draw_top_score(self.best, self.score);
     }
     fn show_game_info(&self) {
-       self.renderer.text_score(self.score);
-       self.renderer.text_level(self.level);
+        self.renderer.text_score(self.score);
+        self.renderer.text_level(self.level);
     }
     fn draw_level_up(&self) {
         self.renderer.draw_level_up(self.level);
